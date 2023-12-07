@@ -7,6 +7,8 @@ from qdrant_client import QdrantClient
 import torch
 import chainlit as cl
 
+isFirst = True
+
 model_name = "BAAI/bge-large-en"
 model_kwargs = {"device": 'cpu'}
 encode_kwargs = {"normalize_embeddings":False}
@@ -43,6 +45,7 @@ print({"score":score, "content":doc.page_content, "metadata":doc.metadata})
 print("##########################################################")
 
 custom_prompt_template = """
+[INST]
 You are an online customer service chatbot that resolves queries from customer of Ocado.com
 Use the following pieces of information to answer the user's question.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -53,14 +56,22 @@ If you don't know the answer, just say that you don't know, don't try to make up
 {question}
 Only return the helpful answer below and nothing else.
 ## Helpful answer:
+[/INST]
 """
-
 def set_custom_prompt():
     """
     Prompt template for QA retrieval for each vectorstore
     """
-    prompt = PromptTemplate(template=custom_prompt_template,
+    global isFirst
+    if isFirst:
+        cpt = "<s>"+custom_prompt_template
+        isFirst = False
+    else:
+        cpt = custom_prompt_template
+    prompt = PromptTemplate(template=cpt,
                             input_variables=['context', 'question'])
+    # prompt = PromptTemplate(template=custom_prompt_template,
+    #                         input_variables=['context', 'question'])
     return prompt
 
 def retrieval_qa_chain(llm, prompt, db):
@@ -73,11 +84,17 @@ def retrieval_qa_chain(llm, prompt, db):
     return qa_chain
 
 def load_llm():
+    # llm = CTransformers(
+    #     model = r"D:\NK_Programming\ML\Examples\Llama2-Medical-Chatbot-main\Llama2-Medical-Chatbot-main\llama-2-7b-chat.ggmlv3.q8_0.bin",
+    #     model_type="llama",
+    #     max_new_tokens = 512,
+    #     temperature = 0.75
+    # )
     llm = CTransformers(
-        model = r"D:\NK_Programming\ML\Examples\Llama2-Medical-Chatbot-main\Llama2-Medical-Chatbot-main\llama-2-7b-chat.ggmlv3.q8_0.bin",
-        model_type="llama",
+        model = r"D:\NK_Programming\AI-Models\mistral-7b-instruct-v0.1.Q5_K_M.gguf",
+        model_type="mistral",
         max_new_tokens = 512,
-        temperature = 0.75
+        temperature = 0.35
     )
     return llm
 
@@ -95,6 +112,7 @@ def final_result(query):
 #chainlit code
 @cl.on_chat_start
 async def start():
+    isFirst = True
     chain = qa_bot()
     msg = cl.Message(content="Starting the bot...")
     await msg.send()
